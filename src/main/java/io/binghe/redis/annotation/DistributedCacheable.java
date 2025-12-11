@@ -9,8 +9,12 @@ import java.util.concurrent.TimeUnit;
 @Documented
 public @interface DistributedCacheable {
     String cachePrefix() default "";
+
     long ttl() default 60L;
+
     TimeUnit timeUnit() default TimeUnit.SECONDS;
+
     Class<?> clazz();
+
     String strategy() default "passThrough"; // passThrough, logicalExpire, mutex
 }
