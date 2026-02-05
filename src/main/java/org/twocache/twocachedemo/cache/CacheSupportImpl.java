@@ -21,6 +21,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.MethodInvoker;
 import org.springframework.util.StringUtils;
 import org.twocache.twocachedemo.cache.expression.CacheOperationExpressionEvaluator;
+import org.twocache.twocachedemo.config.CacheRedisConfig;
 import org.twocache.twocachedemo.constants.CacheConstants;
 import org.twocache.twocachedemo.context.SpringContextWrapper;
 import org.twocache.twocachedemo.serializer.FastJsonRedisSerializer;
@@ -56,9 +57,11 @@ public class CacheSupportImpl implements CacheSupport {
     @Resource
     LettuceConnectionFactory lettuceConnectionFactory;
     @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    private RedisTemplate redisTemplate;
     @Resource
     private RedisCacheWriter redisCacheWriter;
+    @Resource
+    private CacheRedisConfig cacheRedisConfig;
 
 
     @Override
@@ -92,11 +95,12 @@ public class CacheSupportImpl implements CacheSupport {
                    String keyString = String.valueOf(key);
                    String cacheKey3 = redisCache.getCacheKey(keyString);
                    String invocationCacheKey = CacheSupportUtils.getInvocationCacheKey(cacheKey3);
-                   objectObjectRedisTemplate.opsForValue().set(invocationCacheKey, invocation,redisCache.getExpirationSecondTime(), TimeUnit.SECONDS);
+                   //redisTemplate.opsForValue().set(invocationCacheKey, invocation,redisCache.getExpirationSecondTime(), TimeUnit.SECONDS);
+                   cacheRedisConfig.redisTemplate().opsForValue().set(invocationCacheKey, invocation,redisCache.getExpirationSecondTime(), TimeUnit.SECONDS);
                   //todo  redisCacheWriter.put("testcachename",cacheKey3.getBytes(),invocation.toString().getBytes(),Duration.ofSeconds(redisCache.getExpirationSecondTime()));
-                   log.debug("---invocationCacheKey="+invocationCacheKey+"---");
-                   log.debug("---invocation="+invocation.hashCode()+"---");
-                   log.debug("---redisCache.getExpirationSecondTime(),="+ Duration.ofSeconds(redisCache.getExpirationSecondTime()).toSeconds()+"---");
+                   log.info("---invocationCacheKey="+invocationCacheKey+"---");
+                   log.info("---invocation="+invocation.hashCode()+"---");
+                   log.info("---redisCache.getExpirationSecondTime(),="+ Duration.ofSeconds(redisCache.getExpirationSecondTime()).toSeconds()+"---");
                }
            }
        }catch (Exception e){
@@ -191,18 +195,21 @@ public class CacheSupportImpl implements CacheSupport {
             // 通过cacheManager获取操作缓存的cache对象
             Cache cache = cacheManager.getCache(cacheName);
             // 通过Cache对象更新缓存
-            cache.put(invocation.getKey(), computed);
-
+            //cache.put(invocation.getKey(), computed); //之前的RedisCache 有默认过期时间,新版本没有了 需要重新设置过期时间,
             //RedisTemplate redisTemplate = RedisTemplateUtils.getRedisTemplate(redisConnectionFactory);
             CustomizedRedisCache redisCache = (CustomizedRedisCache) cache;
+            log.debug("getCacheKey===" + redisCache.getCacheKey(invocation.getKey()) );
             long expireTime = redisCache.getExpirationSecondTime();
             // 刷新redis中缓存法信息key的有效时间
-            log.debug(" org.twocache.twocachedemo.cache.CacheSupportImpl->refreshCache   刷新缓存：{}-{}，有效时间：{}秒", cacheName, invocation.getKey().toString().getBytes(), expireTime);
-//            redisTemplate.expire(CacheSupportUtils.getInvocationCacheKey(redisCache.getCacheKey(invocation.getKey())), expireTime, TimeUnit.SECONDS);
+            log.info(" org.twocache.twocachedemo.cache.CacheSupportImpl->refreshCache   刷新缓存：{}-{}，有效时间：{}秒", cacheName, invocation.getKey(), expireTime);
+            log.debug("invocation---" + CacheSupportUtils.getInvocationCacheKey(redisCache.getCacheKey(invocation.getKey())) );
+            log.debug("cacheKey---" +redisCache.getCacheKey(invocation.getKey()) );
 
+            cacheRedisConfig.redisTemplate().opsForValue().set(redisCache.getCacheKey(invocation.getKey()),computed, expireTime, TimeUnit.SECONDS);
+            cacheRedisConfig.redisTemplate().expire(CacheSupportUtils.getInvocationCacheKey(redisCache.getCacheKey(invocation.getKey())), expireTime, TimeUnit.SECONDS);
 //            log.debug("缓存：{}-{}，重新加载数据", cacheName, invocation.getKey().toString().getBytes());
         } catch (Exception e) {
-            log.error("刷新缓存失败：" + e.getMessage(), e);
+            log.info("刷新缓存失败：" + e.getMessage(), e);
         }
 
     }

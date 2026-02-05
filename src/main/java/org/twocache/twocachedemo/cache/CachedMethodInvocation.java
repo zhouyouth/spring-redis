@@ -1,6 +1,7 @@
 package org.twocache.twocachedemo.cache;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.io.Serializable;
 import java.lang.reflect.Method;
@@ -13,7 +14,7 @@ import java.util.List;
  * @description  标记了缓存注解的方法类信息，用于主动刷新缓存时调用原始方法加载数据
  * @version 1.0.0
  */
-
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@class")
 public class CachedMethodInvocation implements Serializable {
     private static final long serialVersionUID = -3500300065666841044L;
 
@@ -22,6 +23,7 @@ public class CachedMethodInvocation implements Serializable {
     private String targetMethod;
     private List<Object> arguments;
     private List<String> parameterTypes = new ArrayList<>();
+
 
     public CachedMethodInvocation() {
     }

@@ -16,6 +16,6 @@ import org.springframework.context.annotation.PropertySource;
 @EnableCaching
 @EnableAspectJAutoProxy(proxyTargetClass = true)
 @ComponentScan(value = {"org.twocache.twocachedemo"})
-@PropertySource(value = {"classpath:properties/redis-default.properties", "classpath:properties/redis-default.properties"})
+@PropertySource(value = {"classpath:properties/redis-default.properties", "classpath:application.properties"})
 public class AnnotationConfig extends CacheRedisConfig {
 }

@@ -10,6 +10,7 @@ import org.springframework.data.redis.cache.CacheKeyPrefix;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
@@ -38,7 +39,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 public class CustomizedRedisCacheManager extends RedisCacheManager {
-    private RedisOperations redisOperations;
+    public final RedisOperations redisOperations;
+//    private final RedisConnectionFactory connectionFactory;
     private RedisCacheManager redisCacheManager;
     private RedisCacheConfiguration redisCacheConfiguration;
 
@@ -52,16 +54,18 @@ public class CustomizedRedisCacheManager extends RedisCacheManager {
 
     private volatile Map<String, CacheTime> cacheTimes = null;
 
-    public CustomizedRedisCacheManager(RedisOperations redisOperations, Collection<String> cacheNames, CacheSupport cacheSupport) {
+    public CustomizedRedisCacheManager(RedisOperations redisOperations, Collection<String> cacheNames, CacheSupport cacheSupport, RedisOperations redisOperations1) {
         super(RedisCacheWriter.lockingRedisCacheWriter(null),
                 RedisCacheConfiguration.defaultCacheConfig(),
                 cacheNames.toArray(new String[0]));
+        this.redisOperations = redisOperations1;
     }
 
-    public CustomizedRedisCacheManager(RedisCacheWriter cacheWriter, RedisCacheConfiguration  redisCacheConfiguration) {
+    public CustomizedRedisCacheManager(RedisCacheWriter cacheWriter, RedisOperations redisOperations, RedisCacheConfiguration  redisCacheConfiguration) {
 //        RedisCacheConfiguration defaultCacheConfiguration = redisCacheConfiguration.serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
 //                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.json()));
         super(cacheWriter, redisCacheConfiguration);
+        this.redisOperations = redisOperations;
         this.redisCacheConfiguration = redisCacheConfiguration;
     }
 

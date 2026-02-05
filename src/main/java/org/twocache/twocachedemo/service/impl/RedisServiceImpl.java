@@ -19,7 +19,7 @@ public class RedisServiceImpl implements RedisService {
 
 	//io.mykit.cache.test.redis.spring.service.impl.RedisServiceImpl.getRedidInfo:redis_test-default_value-
 	@Override
-	@Cacheable(value={"test111#30#3",} ,keyGenerator = "cacheKeyGenerator"/*key="#key" + ".#defaultValue",*/)
+	@Cacheable(value={"test333#6#3",} ,keyGenerator = "cacheKeyGenerator"/*key="#key" + ".#defaultValue",*/)
 	public String getRedidInfo(String key, String defaultValue) {
 		log.debug(RedisServiceImpl.class.getName() + "类加载的路径：" + this.getClass().getResource("/").getPath()+ ", hashcode:" );
 		return LoadFile.getValue(key);

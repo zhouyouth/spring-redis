@@ -8,6 +8,7 @@ import org.springframework.cache.support.NullValue;
 import org.springframework.cache.support.SimpleValueWrapper;
 import org.springframework.data.redis.cache.RedisCache;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisOperations;
@@ -35,12 +36,12 @@ public class CustomizedRedisCache extends RedisCache {
 
     private final RedisOperations redisOperations;
     private RedisCacheConfiguration redisCacheConfiguration;
+    @Resource
+    private CustomizedRedisCacheManager customizedRedisCacheManager;
 
 
-    private CacheRedisConfig cacheRedisConfig;
-
-
-
+    @Resource
+    CacheRedisConfig cacheRedisConfig;
     private final byte[] prefix;
 
     /**
@@ -70,7 +71,7 @@ public class CustomizedRedisCache extends RedisCache {
       return  this.redisCacheConfiguration = CacheRedisConfig.redisCacheConfiguration().entryTtl(Duration.ofSeconds(expirationSecondTime));
    }
 
-    public CustomizedRedisCache(String name, byte[] prefix, RedisCacheWriter redisCacheWriter, RedisCacheConfiguration redisCacheConfiguration, long expiration, long preloadSecondTime, boolean allowNullValues, CacheSupport cacheSupport, RedisOperations<? extends Object, ? extends Object> redisOperations,RedisTemplate redisTemplate) {
+    public CustomizedRedisCache(String name, byte[] prefix, RedisCacheWriter redisCacheWriter, RedisCacheConfiguration redisCacheConfiguration, long expiration, long preloadSecondTime, boolean allowNullValues, CacheSupport cacheSupport, RedisOperations redisOperations,RedisTemplate redisTemplate) {
 
                                      super(name, redisCacheWriter,redisCacheConfiguration
 
@@ -80,7 +81,7 @@ public class CustomizedRedisCache extends RedisCache {
 //                        .disableCachingNullValues());
 //        super(name, prefix, redisOperations, expiration, allowNullValues);
         //super(name, redisCacheWriter, redisCacheConfiguration);
-//        this.redisOperations = redisOperations;
+       //this.redisOperations = redisOperations;
         // 指定有效时间
         this.expirationSecondTime = expiration;
         // 指定自动刷新时间
@@ -111,7 +112,7 @@ public class CustomizedRedisCache extends RedisCache {
             return null;
         log.debug("执行刷新缓存的方法...");
         // 刷新缓存数据
-        // refreshCache(key, invocationCacheKey,lookup);
+         refreshCache(cacheKey3, invocationCacheKey,lookup);
         return toValueWrapper(lookup); // Changed from valueWrapper to toValueWrapper
     }
 
@@ -200,24 +201,28 @@ public class CustomizedRedisCache extends RedisCache {
      * 刷新缓存数据
      */
     private void refreshCache(Object key, final String cacheKeyStr, @Nullable Object argument) {
-        Duration ttlDuration = this.getCacheConfiguration().getTtlFunction().getTimeToLive("nihao", "wew");
-        long ttl = ttlDuration.getSeconds();
-        log.debug("未获取到分布式锁：cacheKeyStr···············===>>>" +cacheKeyStr + ", ttl===>>>" + ttl + ",preloadSecondTime===>>>" + CustomizedRedisCache.this.preloadSecondTime);
-        if ( ttl <= CustomizedRedisCache.this.preloadSecondTime) {
+        Long ttl = redisOperations.getExpire(cacheKeyStr);
+        System.out.println("过期时间为==" + ttl);//
+        System.out.println("刷新时间===" + this.preloadSecondTime);
+      //  CustomizedRedisCache.this.cacheSupport.refreshCacheByKey(CustomizedRedisCache.super.getName(), key.toString());
+        log.debug("未获取到分布式锁：cacheKeyStr···············===>>>" +cacheKeyStr + ", ttl===>>>" + ttl + ",preloadSecondTime===>>>"+ this.preloadSecondTime);
+        if (ttl >0 && ttl <= CustomizedRedisCache.this.preloadSecondTime) {
             // 尽量少的去开启线程，因为线程池是有限的
             ThreadTaskUtils.run(new Runnable() {
                 @Override
                 public void run() {
+                    log.debug("进入ThreadTaskUtils.run 开始执行缓存数据刷新...");
                     // 加一个分布式锁，只放一个请求去刷新缓存
                     RedisLock redisLock = new RedisLock((RedisTemplate) redisOperations, cacheKeyStr + "_lock");
                     try {
                         if (redisLock.lock()) {
-                            // 获取锁之后再判断一下过期时间，看是否需要加载数据
-                            Long ttl = CustomizedRedisCache.this.redisOperations.getExpire(cacheKeyStr);
                             log.debug("获取到分布式锁：cacheKeyStr===>>>" +cacheKeyStr + ", ttl===>>>" + ttl + ",preloadSecondTime===>>>" + CustomizedRedisCache.this.preloadSecondTime);
+                            // 获取锁之后再判断一下过期时间，看是否需要加载数据
+//                            Long ttl = CustomizedRedisCache.this.redisOperations.getExpire(cacheKeyStr);
+                            Long ttl = redisOperations.getExpire(cacheKeyStr);
                             if (null != ttl && ttl <= CustomizedRedisCache.this.preloadSecondTime) {
                                 // 通过获取代理方法信息重新加载缓存数据
-                                CustomizedRedisCache.this.cacheSupport.refreshCacheByKey(CustomizedRedisCache.super.getName(), cacheKeyStr);
+                                CustomizedRedisCache.this.cacheSupport.refreshCacheByKey(CustomizedRedisCache.super.getName(), key.toString());
                             }
                         }
                     } catch (Exception e) {

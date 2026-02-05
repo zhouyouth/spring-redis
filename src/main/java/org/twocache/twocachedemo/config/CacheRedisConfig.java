@@ -21,6 +21,7 @@ import org.springframework.data.redis.connection.RedisClusterConfiguration;
 import org.springframework.data.redis.connection.RedisNode;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.RedisSerializer;
@@ -33,6 +34,7 @@ import org.twocache.twocachedemo.cache.CacheTime;
 import org.twocache.twocachedemo.cache.CustomizedRedisCacheManager;
 import org.twocache.twocachedemo.constants.CacheConstants;
 import org.twocache.twocachedemo.serializer.FastJsonRedisSerializer;
+import org.twocache.twocachedemo.serializer.GenericJackson2JsonRedisSerializer;
 import redis.clients.jedis.JedisPoolConfig;
 
 import java.time.Duration;
@@ -92,8 +94,9 @@ public class CacheRedisConfig extends BaseRedisConfig {
      */
     @Bean
     public JedisConnectionFactory jedisConnectionFactory(){
-       JedisConnectionFactory jedisConnectionFactory = new JedisConnectionFactory(redisClusterConfiguration(), jedisPoolConfig());
+        JedisConnectionFactory jedisConnectionFactory = new JedisConnectionFactory(redisClusterConfiguration(), jedisPoolConfig());
         jedisConnectionFactory.setPassword(password);
+//        jedisConnectionFactory.setPassword("wuxinggou");
         jedisConnectionFactory.setTimeout(timeout);
         return jedisConnectionFactory;
     }
@@ -110,23 +113,38 @@ public class CacheRedisConfig extends BaseRedisConfig {
      * @return RedisTemplate对象
      */
     @Bean
-    public RedisTemplate<String, Object> redisTemplate(){
-        RedisTemplate<String, Object> redisTemplate = new RedisTemplate<String, Object>();
-        redisTemplate.setConnectionFactory(lettuceConnectionFactory());
+    public RedisTemplate<String, Object> redisTemplate(){RedisTemplate<String, Object> redisTemplate = new RedisTemplate<String, Object>();
+       redisTemplate.setConnectionFactory(jedisConnectionFactory());
         StringRedisSerializer keySerializer = new StringRedisSerializer();
-        FastJsonRedisSerializer<Object> valueSerializer = new FastJsonRedisSerializer<Object>();
+       // FastJsonRedisSerializer<Object> valueSerializer = new FastJsonRedisSerializer<Object>();
+        GenericJackson2JsonRedisSerializer genericJackson2JsonRedisSerializer = new GenericJackson2JsonRedisSerializer();
         ParserConfig.getGlobalInstance().setAutoTypeSupport(true);
         redisTemplate.setKeySerializer(keySerializer);
-        redisTemplate.setValueSerializer(valueSerializer);
+        redisTemplate.setValueSerializer(genericJackson2JsonRedisSerializer);
         redisTemplate.setHashKeySerializer(keySerializer);
-        redisTemplate.setHashValueSerializer(valueSerializer);
+        redisTemplate.setHashValueSerializer(genericJackson2JsonRedisSerializer);
+
+
+        // 新建一个代理对象（记录了缓存注解的方法类信息）
+        RedisTemplate<String, Object> objectObjectRedisTemplate = new RedisTemplate<>();
+        objectObjectRedisTemplate.setConnectionFactory(jedisConnectionFactory());
+        objectObjectRedisTemplate.setKeySerializer(new StringRedisSerializer());
+        // objectObjectRedisTemplate.setValueSerializer(RedisSerializer.json());
+        // objectObjectRedisTemplate.setValueSerializer(new FastJsonRedisSerializer<>(Object.class));
+        objectObjectRedisTemplate.setValueSerializer(RedisSerializer.json());
+        objectObjectRedisTemplate.afterPropertiesSet();
+
         return redisTemplate;
     }
+//    @Bean
+//    public RedisOperations<String, Object> redisOperations(){
+//        return redisTemplate();
+//    }
     @Bean
     public RedisCacheWriter redisCacheWriter(){
-//        return RedisCacheWriter.lockingRedisCacheWriter(lettuceConnectionFactory());
+       return RedisCacheWriter.lockingRedisCacheWriter(lettuceConnectionFactory());
 //        this.lockTtlFunction = TtlFunction.persistent();
-           return     RedisCacheWriter.lockingRedisCacheWriter(jedisConnectionFactory());
+        //   return     RedisCacheWriter.lockingRedisCacheWriter(jedisConnectionFactory());
 
     }
 //    public static RedisCacheConfiguration defaultCacheConfig(@Nullable ClassLoader classLoader) {
@@ -139,12 +157,12 @@ public static RedisCacheConfiguration redisCacheConfiguration() {
     return RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofSeconds(CacheConstants.DEFAULT_EXPIRATION_SECOND_TIME))
            // .disableKeyPrefix()
-            .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.json()));
+            .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer())) //
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()));//这里控制springredis  cache.put()配置序列化方法
 }
     @Bean
     public CustomizedRedisCacheManager customizedRedisCacheManager(){
-        CustomizedRedisCacheManager customizedAnnotationRedisCacheManager = new CustomizedRedisCacheManager(redisCacheWriter(), redisCacheConfiguration());
+        CustomizedRedisCacheManager customizedAnnotationRedisCacheManager = new CustomizedRedisCacheManager(redisCacheWriter(), redisTemplate(),redisCacheConfiguration());
 //        customizedAnnotationRedisCacheManager.setDefaultExpiration(3600);
 //        customizedAnnotationRedisCacheManager.setUsePrefix(usePrefix);
         Map<String, CacheTime> map = new HashMap<String, CacheTime>();

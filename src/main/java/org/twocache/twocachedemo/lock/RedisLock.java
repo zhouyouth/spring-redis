@@ -7,6 +7,10 @@ import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.commands.JedisCommands;
+import redis.clients.jedis.params.SetParams;
 //import redis.clients.jedis.Jedis;
 //import redis.clients.jedis.JedisCluster;
 //import redis.clients.jedis.JedisCommands;
@@ -247,21 +251,19 @@ public class RedisLock {
                     keys.add(lockKey);
                     List<String> values = new ArrayList<>();
                     values.add(lockValue);
+                    // 集群模式
+                    if (nativeConnection instanceof JedisCluster) {
+                        result = (Long) ((JedisCluster) nativeConnection).eval(UNLOCK_LUA, keys, values);
+                    }
 
-//                    // 集群模式
-//                    if (nativeConnection instanceof JedisCluster) {
-//                        result = (Long) ((JedisCluster) nativeConnection).eval(UNLOCK_LUA, keys, values);
-//                    }
-//
-//                    // 单机模式
-//                    if (nativeConnection instanceof Jedis) {
-//                        result = (Long) ((Jedis) nativeConnection).eval(UNLOCK_LUA, keys, values);
-//                    }
+                    // 单机模式
+                    if (nativeConnection instanceof Jedis) {
+                        result = (Long) ((Jedis) nativeConnection).eval(UNLOCK_LUA, keys, values);
+                    }
 
                     if (result == 0 && !StringUtils.isEmpty(lockKeyLog)) {
                         log.info("Redis分布式锁，解锁{}失败！解锁时间：{}", lockKeyLog, System.currentTimeMillis());
                     }
-
                     locked = result == 0;
                     return result == 1;
                 }
@@ -293,9 +295,9 @@ public class RedisLock {
             public String doInRedis(RedisConnection connection) throws DataAccessException {
                 Object nativeConnection = connection.getNativeConnection();
                 String result = null;
-//                if (nativeConnection instanceof JedisCommands) {
-//                    result = ((JedisCommands) nativeConnection).set(key, value, NX, EX, seconds);
-//                }
+                if (nativeConnection instanceof JedisCommands) {
+                    result = ((JedisCommands) nativeConnection).set(key, value,SetParams.setParams().nx().ex(seconds));
+                }
 
                 if (!StringUtils.isEmpty(lockKeyLog) && !StringUtils.isEmpty(result)) {
                     log.info("获取锁{}的时间：{}", lockKeyLog, System.currentTimeMillis());
