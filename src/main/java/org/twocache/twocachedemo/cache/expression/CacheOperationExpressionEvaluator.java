@@ -45,29 +45,27 @@ public class CacheOperationExpressionEvaluator extends CachedExpressionEvaluator
 	public static final String RESULT_VARIABLE = "result";
 
 
-	private final Map<ExpressionKey, Expression> keyCache = new ConcurrentHashMap<ExpressionKey, Expression>(64);
+	private final Map<ExpressionKey, Expression> keyCache = new ConcurrentHashMap<>(64);
 
-	private final Map<ExpressionKey, Expression> conditionCache = new ConcurrentHashMap<ExpressionKey, Expression>(64);
+	private final Map<ExpressionKey, Expression> conditionCache = new ConcurrentHashMap<>(64);
 
-	private final Map<ExpressionKey, Expression> unlessCache = new ConcurrentHashMap<ExpressionKey, Expression>(64);
+	private final Map<ExpressionKey, Expression> unlessCache = new ConcurrentHashMap<>(64);
 
-	private final Map<AnnotatedElementKey, Method> targetMethodCache =
-			new ConcurrentHashMap<AnnotatedElementKey, Method>(64);
+	private final Map<AnnotatedElementKey, Method> targetMethodCache = new ConcurrentHashMap<>(64);
 
 
 	/**
+	 * Create an {@link EvaluationContext} without a return value.
 	 * @param caches the current caches
 	 * @param method the method
 	 * @param args the method arguments
 	 * @param target the target object
 	 * @param targetClass the target class
 	 * @param beanFactory    BeanFactory对象
-	 * Create an {@link EvaluationContext} without a return value.
-	 * @see #createEvaluationContext(Collection, Method, Object[], Object, Class, Object, BeanFactory)
 	 * @return EvaluationContext对象
 	 *
 	 */
-	public EvaluationContext createEvaluationContextluationContext(Collection<? extends Cache> caches,
+	public EvaluationContext createEvaluationContext(Collection<? extends Cache> caches,
                                                      Method method, Object[] args, Object target, Class<?> targetClass, BeanFactory beanFactory) {
 
 		return createEvaluationContext(caches, method, args, target, targetClass, NO_RESULT, beanFactory);
@@ -140,6 +138,4 @@ public class CacheOperationExpressionEvaluator extends CachedExpressionEvaluator
 		}
 		return targetMethod;
 	}
-
-
 }
