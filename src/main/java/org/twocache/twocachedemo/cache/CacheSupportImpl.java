@@ -5,6 +5,7 @@ import org.springframework.aop.framework.AopProxyUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.interceptor.KeyGenerator;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.expression.AnnotatedElementKey;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -39,6 +40,7 @@ public class CacheSupportImpl implements CacheSupport {
     private KeyGenerator keyGenerator;
 
     @Autowired
+    @Lazy
     private RedisCacheManager cacheManager;
 
     @Autowired
@@ -196,12 +198,11 @@ public class CacheSupportImpl implements CacheSupport {
     }
 
     public Collection<? extends Cache> getCache(Set<String> annotatedCacheNames) {
-        Collection<String> cacheNames = generateValue(annotatedCacheNames);
-        if (cacheNames == null) {
+        if (annotatedCacheNames == null) {
             return Collections.emptyList();
         } else {
             Collection<Cache> result = new ArrayList<>();
-            for (String cacheName : cacheNames) {
+            for (String cacheName : annotatedCacheNames) {
                 Cache cache = this.cacheManager.getCache(cacheName);
                 if (cache == null) {
                     throw new IllegalArgumentException("Cannot find cache named '" + cacheName + "'");
@@ -210,15 +211,5 @@ public class CacheSupportImpl implements CacheSupport {
             }
             return result;
         }
-    }
-
-    private Collection<String> generateValue(Set<String> annotatedCacheNames) {
-        Collection<String> cacheNames = new HashSet<>();
-        for (final String cacheName : annotatedCacheNames) {
-            String[] cacheParams = cacheName.split(CacheConstants.SEPARATOR);
-            String realCacheName = cacheParams[0];
-            cacheNames.add(realCacheName);
-        }
-        return cacheNames;
     }
 }

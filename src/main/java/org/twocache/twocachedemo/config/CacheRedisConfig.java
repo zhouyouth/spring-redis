@@ -1,6 +1,9 @@
 package org.twocache.twocachedemo.config;
 
 import com.alibaba.fastjson.parser.ParserConfig;
+import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.alibaba.fastjson.support.config.FastJsonConfig;
+import com.alibaba.fastjson.support.spring.FastJsonRedisSerializer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -11,16 +14,14 @@ import org.springframework.data.redis.connection.RedisClusterConfiguration;
 import org.springframework.data.redis.connection.RedisNode;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.twocache.twocachedemo.aspect.CachingAnnotationsAspect;
 import org.twocache.twocachedemo.cache.CacheKeyGenerator;
+import org.twocache.twocachedemo.cache.CacheSupport;
 import org.twocache.twocachedemo.cache.CacheTime;
 import org.twocache.twocachedemo.cache.CustomizedRedisCacheManager;
 import org.twocache.twocachedemo.constants.CacheConstants;
-import org.twocache.twocachedemo.serializer.FastJsonRedisSerializer;
 import redis.clients.jedis.JedisPoolConfig;
 
 import java.time.Duration;
@@ -78,17 +79,19 @@ public class CacheRedisConfig extends BaseRedisConfig {
         redisTemplate.setConnectionFactory(jedisConnectionFactory());
         
         StringRedisSerializer keySerializer = new StringRedisSerializer();
-        // 使用官方的 GenericJackson2JsonRedisSerializer
-        //GenericJackson2JsonRedisSerializer genericJackson2JsonRedisSerializer = new GenericJackson2JsonRedisSerializer();
-        JacksonJsonRedisSerializer<Object> jacksonJsonRedisSerializer = new JacksonJsonRedisSerializer<>(Object.class);
         
-        // FastJson 配置可能不再需要，除非其他地方用到
+        // 配置 FastJsonRedisSerializer
+        FastJsonRedisSerializer<Object> fastJsonRedisSerializer = new FastJsonRedisSerializer<>(Object.class);
+        FastJsonConfig fastJsonConfig = new FastJsonConfig();
+        fastJsonConfig.setSerializerFeatures(SerializerFeature.WriteClassName);
+        fastJsonRedisSerializer.setFastJsonConfig(fastJsonConfig);
+        
         ParserConfig.getGlobalInstance().setAutoTypeSupport(true);
         
         redisTemplate.setKeySerializer(keySerializer);
-        redisTemplate.setValueSerializer(jacksonJsonRedisSerializer);
+        redisTemplate.setValueSerializer(fastJsonRedisSerializer);
         redisTemplate.setHashKeySerializer(keySerializer);
-        redisTemplate.setHashValueSerializer(jacksonJsonRedisSerializer);
+        redisTemplate.setHashValueSerializer(fastJsonRedisSerializer);
         
         redisTemplate.afterPropertiesSet();
         return redisTemplate;
@@ -102,17 +105,22 @@ public class CacheRedisConfig extends BaseRedisConfig {
 
     @Bean
     public RedisCacheConfiguration redisCacheConfiguration() {
+        // 配置 FastJsonRedisSerializer
+        FastJsonRedisSerializer<Object> fastJsonRedisSerializer = new FastJsonRedisSerializer<>(Object.class);
+        FastJsonConfig fastJsonConfig = new FastJsonConfig();
+        fastJsonConfig.setSerializerFeatures(SerializerFeature.WriteClassName);
+        fastJsonRedisSerializer.setFastJsonConfig(fastJsonConfig);
+
         return RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofSeconds(CacheConstants.DEFAULT_EXPIRATION_SECOND_TIME))
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new FastJsonRedisSerializer<>(Object.class)));
-//                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()));
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(fastJsonRedisSerializer));
     }
 
     @Bean
-    public CustomizedRedisCacheManager customizedRedisCacheManager(){
-        // 注意参数顺序：Writer, Config, Operations
-        CustomizedRedisCacheManager customizedAnnotationRedisCacheManager = new CustomizedRedisCacheManager(redisCacheWriter(), redisCacheConfiguration(), redisTemplate());
+    public CustomizedRedisCacheManager customizedRedisCacheManager(CacheSupport cacheSupport){
+        // 注意参数顺序：Writer, Config, Operations, CacheSupport
+        CustomizedRedisCacheManager customizedAnnotationRedisCacheManager = new CustomizedRedisCacheManager(redisCacheWriter(), redisCacheConfiguration(), redisTemplate(), cacheSupport);
         
         Map<String, CacheTime> map = new HashMap<>();
         map.put(defaultExpirationKey, cacheTime());

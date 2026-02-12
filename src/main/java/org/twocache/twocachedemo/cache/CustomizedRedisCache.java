@@ -25,14 +25,16 @@ public class CustomizedRedisCache extends RedisCache {
     private final CacheSupport cacheSupport;
     private final long preloadSecondTime;
     private final long expirationSecondTime;
+    private final String originalCacheName;
 
     public CustomizedRedisCache(String name, RedisCacheWriter redisCacheWriter, RedisCacheConfiguration redisCacheConfiguration,
-                                long expiration, long preloadSecondTime, CacheSupport cacheSupport, RedisOperations redisOperations) {
+                                long expiration, long preloadSecondTime, CacheSupport cacheSupport, RedisOperations redisOperations, String originalCacheName) {
         super(name, redisCacheWriter, expiration > 0 ? redisCacheConfiguration.entryTtl(Duration.ofSeconds(expiration)) : redisCacheConfiguration);
         this.redisOperations = redisOperations;
         this.expirationSecondTime = expiration;
         this.preloadSecondTime = preloadSecondTime;
         this.cacheSupport = cacheSupport;
+        this.originalCacheName = originalCacheName;
     }
 
     @Override
@@ -62,7 +64,8 @@ public class CustomizedRedisCache extends RedisCache {
                         Long currentTtl = redisOperations.getExpire(cacheKeyStr);
                         if (currentTtl != null && currentTtl > 0 && currentTtl <= preloadSecondTime) {
                             log.info("执行缓存刷新。key: {}", cacheKeyStr);
-                            cacheSupport.refreshCacheByKey(getName(), key.toString());
+                            // 传递 originalCacheName (带时间后缀的名称) 以便 CacheSupportImpl 能获取到正确的 Cache 实例
+                            cacheSupport.refreshCacheByKey(originalCacheName, cacheKeyStr);
                         }
                     }
                 } catch (Exception e) {

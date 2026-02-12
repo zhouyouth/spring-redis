@@ -7,7 +7,6 @@ import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.util.CollectionUtils;
-import org.twocache.twocachedemo.utils.SpringContext;
 
 import java.time.Duration;
 import java.util.Map;
@@ -23,18 +22,20 @@ public class CustomizedRedisCacheManager extends RedisCacheManager {
 
     private final RedisOperations redisOperations;
     private final RedisCacheWriter redisCacheWriter;
+    private final CacheSupport cacheSupport;
     
     private volatile Map<String, CacheTime> cacheTimes = new ConcurrentHashMap<>();
 
-    public CustomizedRedisCacheManager(RedisCacheWriter cacheWriter, RedisCacheConfiguration defaultCacheConfiguration, RedisOperations redisOperations) {
+    public CustomizedRedisCacheManager(RedisCacheWriter cacheWriter, RedisCacheConfiguration defaultCacheConfiguration, RedisOperations redisOperations, CacheSupport cacheSupport) {
         super(cacheWriter, defaultCacheConfiguration);
         this.redisCacheWriter = cacheWriter;
         this.redisOperations = redisOperations;
+        this.cacheSupport = cacheSupport;
     }
 
     @Override
     protected RedisCache createRedisCache(String name, RedisCacheConfiguration cacheConfig) {
-        CacheSupport cacheSupport = getCacheSupport();
+        log.info("开始创建 RedisCache: {}", name);
         String cacheKey = name;
         long expiration = 0;
         long preload = 0;
@@ -50,8 +51,15 @@ public class CustomizedRedisCacheManager extends RedisCacheManager {
                 if (cacheTime != null) {
                     expiration = cacheTime.getExpirationSecondTime();
                     preload = cacheTime.getPreloadSecondTime();
+                    log.info("解析到缓存配置 - name: {}, cacheKey: {}, expiration: {}, preload: {}", name, cacheKey, expiration, preload);
+                } else {
+                    log.warn("解析缓存时间失败，cacheTime 为 null - name: {}", name);
                 }
+            } else {
+                log.warn("解析缓存时间失败，map 为空 - name: {}", name);
             }
+        } else {
+            log.error("CacheSupport 为 null，将使用默认配置 - name: {}", name);
         }
 
         // 如果配置了过期时间，覆盖默认配置
@@ -59,16 +67,8 @@ public class CustomizedRedisCacheManager extends RedisCacheManager {
             cacheConfig = cacheConfig.entryTtl(Duration.ofSeconds(expiration));
         }
 
-        return new CustomizedRedisCache(cacheKey, redisCacheWriter, cacheConfig, expiration, preload, cacheSupport, redisOperations);
-    }
-
-    private CacheSupport getCacheSupport() {
-        try {
-            return SpringContext.getBean(CacheSupport.class);
-        } catch (Exception e) {
-            log.warn("无法获取 CacheSupport Bean: {}", e.getMessage());
-            return null;
-        }
+        // 传递原始名称 name 给 CustomizedRedisCache
+        return new CustomizedRedisCache(cacheKey, redisCacheWriter, cacheConfig, expiration, preload, cacheSupport, redisOperations, name);
     }
     
     public void setCacheTimes(Map<String, CacheTime> cacheTimes) {
