@@ -82,8 +82,6 @@ public class TwocachedemoApplicationTests {
 //    }
 @Test
 public void ttl(){
-    Long hello = customizedRedisCacheManager.redisOperations.getExpire("hello");
-    System.out.println("过期时间为==" + hello);
 }
 
 }
